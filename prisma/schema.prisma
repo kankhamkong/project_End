@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  User
+  ADMIN
+}
+
+model User {
+  id           Int            @id @default(autoincrement())
+  username     String         @unique @db.VarChar(30)
+  password     String         @db.VarChar(72)
+  email        String?
+  histories    History[]
+  Subscription Subscription[]
+  Pay          Pay[]
+  role        Role
+
+  @@map("users")
+}
+
+model Book {
+  id           Int            @id @default(autoincrement())
+  title        String         @db.VarChar(30)
+  author       String         @db.VarChar(30)
+  price        String         @db.VarChar(30)
+  volume       String
+  rate         String
+  image        String
+  Subscription Subscription[]
+  Pay          Pay[]
+
+  @@map("books")
+}
+
+model Subscription {
+  id        Int       @id @default(autoincrement())
+  start     DateTime
+  end       DateTime
+  userId    Int       @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId    Int       @map("book_id")
+  book      Book?     @relation(fields: [bookId], references: [id])
+  histories History[]
+
+  @@map("Subscriptions")
+}
+
+model History {
+  id             Int           @id @default(autoincrement())
+  userId         Int           @map("user_id")
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
+  subscriptionId Int?
+
+  @@map("History")
+}
+
+model Pay {
+  id     Int   @id @default(autoincrement())
+  userId Int   @map("user_id")
+  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId Int   @map("book_id")
+  book   Book? @relation(fields: [bookId], references: [id], onDelete: Cascade)
+}
