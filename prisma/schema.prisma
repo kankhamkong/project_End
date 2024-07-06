@@ -15,60 +15,90 @@ enum Role {
   ADMIN
 }
 
+enum Order_detailsStatus {
+  SUCCESS
+  IN_PAYMENT
+}
+
 model User {
   id           Int            @id @default(autoincrement())
   username     String         @unique @db.VarChar(30)
   password     String         @db.VarChar(72)
   email        String?
-  histories    History[]
-  Subscription Subscription[]
-  Pay          Pay[]
-  role        Role
+  role         Role
+  Cart         Cart[]
+  Order        Order[]
+  Payment      Payment[]
 
   @@map("users")
 }
 
+
+
 model Book {
-  id           Int            @id @default(autoincrement())
-  title        String         @db.VarChar(30)
-  author       String         @db.VarChar(30)
-  price        String         @db.VarChar(30)
-  volume       String
-  rate         String
-  image        String
-  Subscription Subscription[]
-  Pay          Pay[]
+  id            Int             @id @default(autoincrement())
+  title         String          @db.VarChar(30)
+  author        String          @db.VarChar(30)
+  price         Decimal         @db.Decimal(10, 2)
+  currency      String          @db.VarChar(30)
+  volume        String
+  rate          String
+  category      String
+  image         String          @db.Text
+  cart          Cart[]
+  order_details order_details[]
 
   @@map("books")
 }
 
-model Subscription {
-  id        Int       @id @default(autoincrement())
-  start     DateTime
-  end       DateTime
-  userId    Int       @map("user_id")
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookId    Int       @map("book_id")
-  book      Book?     @relation(fields: [bookId], references: [id])
-  histories History[]
+model Cart {
+  id       Int   @id @default(autoincrement())
+  userId   Int   @map("user_id")
+  user     User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookId   Int   @map("book_id")
+  book     Book? @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  quantity Int
+  amount   Int
 
-  @@map("Subscriptions")
+  @@map("cart")
 }
 
-model History {
-  id             Int           @id @default(autoincrement())
-  userId         Int           @map("user_id")
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Subscription   Subscription? @relation(fields: [subscriptionId], references: [id])
-  subscriptionId Int?
+model Order {
+  id            Int             @id @default(autoincrement())
+  userId        Int             @map("user_id")
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          DateTime
+  total_price   Int
+  status        Int
+  order_details order_details[]
+  Payment       Payment[]
 
-  @@map("History")
+  @@map("order")
 }
 
-model Pay {
-  id     Int   @id @default(autoincrement())
-  userId Int   @map("user_id")
-  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bookId Int   @map("book_id")
-  book   Book? @relation(fields: [bookId], references: [id], onDelete: Cascade)
+model order_details {
+  detail_id Int   @id @default(autoincrement())
+  order     Order @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  order_id  Int
+  book      Book  @relation(fields: [book_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  book_id   Int
+  price     Float
+  quantity  Int
+  amount    Float
+}
+
+model Payment {
+  id            Int      @id @default(autoincrement())
+  totalQuantity Int      @map("total_quantity")
+  totalPrice    Int      @map("total_price")
+  method        String?
+  createdAt     DateTime @updatedAt
+  status        Int
+  realname      String
+  surname       String
+  address       String
+  userId        Int      @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Order         Order?   @relation(fields: [orderId], references: [id])
+  orderId       Int?
 }

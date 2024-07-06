@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken')
 const db = require("../models/db");
 
 exports.register = async (req, res, next) => {
-  const { username, password, confirmPassword, email, Roles } = req.body;
+  const { username, password, confirmPassword, email } = req.body;
   try {
     // validation
     console.log(req.body)
@@ -20,7 +20,7 @@ exports.register = async (req, res, next) => {
       username,
       password : hashedPassword,
       email,
-      Roles
+      role : 'User'
     };
 
     const rs = await db.user.create({ data  })
@@ -60,6 +60,10 @@ exports.login = async (req, res, next) => {
 };
 
 exports.getme = (req,res,next) => {
-  res.json(req.user)
+  try {
+    res.json(req.user)
+  }catch(err) {
+    console.log(err)
+  }
 }
 

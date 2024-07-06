@@ -2,19 +2,17 @@ const bcrypt = require('bcryptjs')
 const {PrismaClient} = require('@prisma/client')
 const prisma = new PrismaClient()
 
+const password = bcrypt.hashSync('123456')
+const userData = [
+  {email: 'andy@mail.com', password, username:'andy', role: 'ADMIN',},
+  {email: 'ken@mail.com', password, username:'ken', role: 'User',},
 
-const subscriptionsData = [
- {start: new Date(), end: new Date(), userId:1, bookId:1}
-  
 ]
 
 const run = async () => {
-  await prisma.subscription.createMany({
-    data : subscriptionsData
+  await prisma.user.createMany({
+    data : userData
   })
-  // await prisma.todo.createMany({
-  //   data : todoData
-  // })
 }
 
 run()
