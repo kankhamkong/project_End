@@ -13,27 +13,23 @@ datasource db {
 enum Role {
   User
   ADMIN
-}
-
-enum Order_detailsStatus {
-  SUCCESS
-  IN_PAYMENT
+  DELIVERY
 }
 
 model User {
-  id           Int            @id @default(autoincrement())
-  username     String         @unique @db.VarChar(30)
-  password     String         @db.VarChar(72)
-  email        String?
-  role         Role
-  Cart         Cart[]
-  Order        Order[]
-  Payment      Payment[]
+  id          Int           @id @default(autoincrement())
+  username    String        @unique @db.VarChar(30)
+  password    String        @db.VarChar(72)
+  email       String?
+  role        Role
+  Cart        Cart[]
+  Order       Order[]
+  Payment     Payment[]
+  Address     Address[]
+  Profileuser Profileuser[]
 
   @@map("users")
 }
-
-
 
 model Book {
   id            Int             @id @default(autoincrement())
@@ -45,6 +41,7 @@ model Book {
   rate          String
   category      String
   image         String          @db.Text
+  stock         Int
   cart          Cart[]
   order_details order_details[]
 
@@ -88,17 +85,42 @@ model order_details {
 }
 
 model Payment {
-  id            Int      @id @default(autoincrement())
-  totalQuantity Int      @map("total_quantity")
-  totalPrice    Int      @map("total_price")
-  method        String?
-  createdAt     DateTime @updatedAt
-  status        Int
-  realname      String
-  surname       String
-  address       String
-  userId        Int      @map("user_id")
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Order         Order?   @relation(fields: [orderId], references: [id])
-  orderId       Int?
+  id                Int      @id @default(autoincrement())
+  totalQuantity     Int      @map("total_quantity")
+  totalPrice        Int      @map("total_price")
+  method            String?
+  createdAt         DateTime @updatedAt
+  status            Int
+  userId            Int      @map("user_id")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Order             Order?   @relation(fields: [orderId], references: [id])
+  orderId           Int?
+  addrssId          Int      @map("addrss_id")
+  addrss            Address? @relation(fields: [addrssId], references: [id], onDelete: Cascade)
+  statusdelovery    Int
+  statusdescription String
+}
+
+model Address {
+  id       Int       @id @default(autoincrement())
+  userId   Int       @map("user_id")
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  realname String
+  surname  String
+  phone    String
+  address  String
+  district String
+  province String
+  postcode String
+  Payment  Payment[]
+}
+
+model Profileuser {
+  id       Int    @id @default(autoincrement())
+  userId   Int    @map("user_id")
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  realname String
+  lastname String
+  gender   Int
+  phone    String
 }

@@ -8,6 +8,7 @@ const bookRoute = require('./routes/Book-route')
 const cartRoute = require('./routes/Cart-route')
 const orderRoute = require('./routes/Order-route')
 const paymentRoute = require('./routes/Payment-route')
+const addressRoute = require('./routes/Address-route')
 
 const app = express()
 
@@ -20,6 +21,7 @@ app.use('/book',bookRoute )
 app.use('/cart', cartRoute)
 app.use('/order',orderRoute)
 app.use('/payment',paymentRoute)
+app.use('/address', addressRoute)
 
 
 

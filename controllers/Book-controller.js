@@ -15,8 +15,9 @@ exports.getByUser = async (req, res, next) => {
 
 exports.addBook = async (req, res, next) => {
   try {
-    const { title, author, price, volume, rate, image,category } = req.body;
-    // console.log(req.body);
+    const { title, author, price, volume, rate, image, category, stock } = req.body;
+
+    const stockInt = parseInt(stock, 10);
 
     const book = await prisma.book.create({
       data: {
@@ -26,8 +27,9 @@ exports.addBook = async (req, res, next) => {
         volume,
         rate,
         image,
-        currency: "THB",
-        category
+        currency: "THB", // Default value for currency
+        category,
+        stock: stockInt,
       },
     });
     res.json({ book });
@@ -36,36 +38,26 @@ exports.addBook = async (req, res, next) => {
   }
 };
 
-exports.updateTodo = async (req, res, next) => {
-  // validate req.params + req.body
+exports.updateBook = async (req, res, next) => {
   const { id } = req.params;
   const data = req.body;
+
+  // Convert stock to integer if it exists in the request body
+  if (data.stock) {
+    data.stock = parseInt(data.stock, 10);
+  }
+
   try {
-    const rs = await db.todo.update({
+    const rs = await prisma.book.update({
       data: { ...data },
-      where: { id: +id, userId: req.user.id },
+      where: { id: parseInt(id, 10) }, // Ensure `id` is an integer
     });
-    res.json({ msg: "Update ok", result: rs });
+    res.json({ msg: "อัพเดทเรียบร้อย", result: rs });
   } catch (err) {
     next(err);
   }
 };
 
-exports.deleteTodo = async (req, res, next) => {
-  const { id } = req.params;
-  try {
-    const rs = await db.todo.delete({
-      where: { id: +id, userId: req.user.id },
-    });
-    res.json({ msg: "Delete ok", result: rs });
-  } catch (err) {
-    next(err);
-  }
-};
-
-exports.getAllStatus = async (req, res, next) => {
-  res.json({ status: Object.values(Status) });
-};
 
 exports.getBook = async (req, res, next) => {
   try {
@@ -120,14 +112,6 @@ exports.getBookOptions = async (req, res, next) => {
   }
 };
 
-exports.getSubscriptions = async (req, res, next) => {
-  try {
-    const subscriptions = await db.subscription.findMany();
-    res.json({ subscriptions });
-  } catch (err) {
-    next(err);
-  }
-};
 
 exports.deleteBook = async (req, res, next) => {
   const { id } = req.params;
@@ -141,23 +125,8 @@ exports.deleteBook = async (req, res, next) => {
   }
 };
 
-exports.creativeSubscriptions = async (req, res, next) => {
-  try {
-    const { start, end, userId, bookId } = req.body;
+let ddp
 
-    const subscription = await prisma.subscription.create({
-      data: {
-        start: new Date(start),
-        end: new Date(end),
-        userId,
-        bookId,
-      },
-    });
-    res.json(subscription);
-  } catch (err) {
-    next(err);
-  }
-};
 
 exports.addToCart = async (req, res, next) => {
   try {
@@ -189,6 +158,8 @@ exports.addToCart = async (req, res, next) => {
             parseFloat(book.price) * (existingCartItem.quantity + quantity),
         },
       });
+
+      ddp = existingCartItem.quantity + quantity
     } else {
       cartItem = await prisma.cart.create({
         data: {
@@ -223,7 +194,14 @@ exports.updateCartItem = async (req, res, next) => {
       return res.status(404).json({ error: "Cart item not found" });
     }
 
+
+    if (quantity > ddp) {
+      return res.status(400).json({ error: "Requested quantity exceeds available stock" });
+    }
+
     const newAmount = parseFloat(cartItem.book.price) * quantity;
+
+    const quantityDifference = cartItem.quantity - quantity; 
 
     const updatedCartItem = await prisma.cart.update({
       where: { id: parseInt(id) },
@@ -233,11 +211,31 @@ exports.updateCartItem = async (req, res, next) => {
       },
     });
 
+    if (quantityDifference > 0) {
+      await prisma.book.update({
+        where: { id: cartItem.book.id },
+        data: {
+          stock: cartItem.book.stock + quantityDifference,
+        },
+      });
+    }
+
+    if (quantityDifference !== 0) {
+      await prisma.book.update({
+        where: { id: cartItem.book.id },
+        data: {
+          stock: cartItem.book.stock + quantityDifference,
+        },
+      });
+    }
+
     res.json({ updatedCartItem });
   } catch (err) {
     next(err);
   }
 };
+
+
 
 exports.getCartByUser = async (req, res, next) => {
   try {
@@ -260,6 +258,23 @@ exports.removeCartItem = async (req, res, next) => {
   const { id } = req.params;
   try {
     const userId = req.user.id;
+
+    // Retrieve the cart item with the associated book details before deletion
+    const cartItem = await prisma.cart.findUnique({
+      where: {
+        id: parseInt(id)
+      },
+      include: {
+        book: true
+      }
+    });
+
+    // Check if the cart item exists and belongs to the user
+    if (!cartItem || cartItem.userId !== userId) {
+      return res.status(404).json({ error: "Cart item not found" });
+    }
+
+    // Delete the cart item
     const rs = await prisma.cart.deleteMany({
       where: {
         id: parseInt(id),
@@ -267,11 +282,22 @@ exports.removeCartItem = async (req, res, next) => {
       },
     });
 
-    res.json({ msg: "Item removed from cart", result: rs });
+    // Update the book's stock by adding back the quantity of the removed cart item
+    const updatedBook = await prisma.book.update({
+      where: {
+        id: cartItem.book.id
+      },
+      data: {
+        stock: cartItem.book.stock + cartItem.quantity // Increase the stock by the quantity of the removed cart item
+      }
+    });
+
+    res.json({ msg: "Item removed from cart", result: rs, updatedBook });
   } catch (err) {
     next(err);
   }
 };
+
 
 exports.createOrder = async (req, res, next) => {
   try {
@@ -314,9 +340,9 @@ exports.createOrder = async (req, res, next) => {
       data: orderDetailsData,
     });
 
-    await prisma.cart.deleteMany({
-      where: { userId: Number(userId) },
-    });
+    // await prisma.cart.deleteMany({
+    //   where: { userId: Number(userId) },
+    // });
 
     res.json({ result: "Create Order successfully", order });
   } catch (err) {
@@ -327,22 +353,28 @@ exports.createOrder = async (req, res, next) => {
 exports.getOrder = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    console.log(userId);
+    
+    // ดึงข้อมูลคำสั่งซื้อที่สร้างล่าสุด (status: 0)
     const order = await prisma.order.findFirst({
-      where: { userId: Number(userId), status: 0 }, //อันนี้คือ get order โดยใช้ user_id ใช่ไหม ถ้าจะให้แอดมินดูได้ต้อง ลบ userId ออก ไม่ต้องใช้
+      where: { userId: Number(userId), status: 0 },
+      orderBy: {
+        date: 'desc',  // เรียงตามวันที่สร้างจากใหม่ไปเก่า
+      },
       include: { user: true },
     });
-    console.log(order);
 
+    // ถ้าไม่พบคำสั่งซื้อ ให้แจ้งเตือน
     if (!order) {
-      return res.status(404).json({ error: "Order not found" });
+      return res.status(404).json({ error: "ไม่พบคำสั่งซื้อ" });
     }
 
+    // ดึงข้อมูลรายละเอียดของคำสั่งซื้อ
     const orderDetails = await prisma.order_details.findMany({
       where: { order_id: order.id },
       include: { book: true },
     });
 
+    // ส่งข้อมูลคำสั่งซื้อและรายละเอียดกลับไป
     res.json({ order, orderDetails });
   } catch (err) {
     next(err);
@@ -425,9 +457,8 @@ exports.createPayment = async (req, res, next) => {
         method: paymentData.method,
         userId: req.user.id,
         status: 1,
-        realname: paymentData.realname,
-        surname: paymentData.surname,
         address: paymentData.address,
+        statusdelovery: 0,
       },
     });
 
@@ -444,6 +475,10 @@ exports.createPayment = async (req, res, next) => {
       },
     });
 
+    await prisma.cart.deleteMany({
+      where: { userId: Number(req.user.id) }, // แก้ไขเป็น req.user.id แทน userId
+    });
+
     res.json({ payment: rs, order: updateOrder });
   } catch (error) {
     next(error);
@@ -454,6 +489,11 @@ exports.createPayment = async (req, res, next) => {
 exports.cancelPayment = async (req, res, next) => {
   try {
     const { paymentData } = req.body;
+    console.log(paymentData)
+    if(paymentData === undefined){
+      return res.status(400).json({ message: "Data is undefined" });
+    }
+
     const rs = await prisma.payment.create({
       data: {
         totalQuantity: paymentData.totalQuantity,
@@ -462,9 +502,15 @@ exports.cancelPayment = async (req, res, next) => {
         method: paymentData.method,
         userId: req.user.id,
         status: 2,
+        statusdelovery: 0,
       },
     });
 
+    console.log(rs)
+
+    if (!rs) {
+      return res.status(400).json({ message: "Unable to create payment" });
+    }
     const rs1 = await prisma.order.update({
       where: {
         id: rs.orderId,
@@ -475,7 +521,7 @@ exports.cancelPayment = async (req, res, next) => {
     });
     res.json({ rs, rs1 });
   } catch (error) {
-    new error();
+    
   }
 };
 
@@ -517,6 +563,131 @@ exports.getPaymentHistoryForAdmin = async (req, res, next) => {
       console.log("No payments found");
     }
     res.json(payments);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updatePaymentStatuscancel = async (req, res, next) => {
+  try {
+    const { status, statusdelovery } = req.body;
+    const { id } = req.params; // Payment ID from the request parameters
+
+    console.log(id, status, statusdelovery);
+    console.log(req.body)
+
+    // Update payment status
+    const updatedPayment = await prisma.payment.update({
+      where: { id:+id }, // Use the 'id' directly from req.params
+      data: {
+        status: status, // Use the status from the request body
+        statusdelovery: statusdelovery, // Use the statusdelovery from the request body
+      },
+    });
+
+    // If you need to update the order status as well, uncomment and complete the following code:
+    // const updatedOrder = await prisma.order.update({
+    //   where: { id: orderId }, // Replace 'orderId' with the correct order ID
+    //   data: { status: 4 }, // Assuming 4 is the status you want to set for the order
+    // });
+
+    res.json({ payment: updatedPayment });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updatePaymentStatus = async (req, res, next) => {
+  try{
+    const {statusdelovery} = req.body;
+    const {id} = req.params;
+
+    const updatedPayment = await prisma.payment.update({
+      where: { id:+id }, // Use the 'id' directly from req.params
+      data: { 
+        statusdelovery: statusdelovery, // Use the statusdelovery from the request body
+      },
+    });
+
+    res.json({ payment: updatedPayment });
+  } catch (error) {
+    next(error);
+  }
+}
+
+exports.createAddress = async (req, res, next) => {
+  try {
+    const {
+      realname,
+      surname,
+      phone,
+      address,
+      district,
+      province,
+      postcode,
+    } = req.body;
+    const userId = req.user.id;
+
+    const newAddress = await prisma.address.create({
+      data: {
+        userId,
+        realname,
+        surname,
+        phone,
+        address,
+        district,
+        province,
+        postcode,
+      },
+    });
+
+    res.json({ message: "Address created successfully", newAddress });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getAddressesByUser = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const addresses = await prisma.address.findMany({
+      where: { userId },
+    });
+
+    res.json({ addresses });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateAddress = async (req, res, next) => {
+  try {
+    const { id } = req.params; // Address ID from the request parameters
+    const {
+      realname,
+      surname,
+      phone,
+      address,
+      district,
+      province,
+      postcode,
+    } = req.body;
+
+    const updatedAddress = await prisma.address.update({
+      where: { id: parseInt(id) },
+      data: {
+        realname,
+        surname,
+        phone,
+        address,
+        district,
+        province,
+        postcode,
+      },
+    });
+
+    res.json({ message: "Address updated successfully", updatedAddress });
   } catch (error) {
     next(error);
   }

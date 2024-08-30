@@ -5,31 +5,84 @@ const db = require("../models/db");
 exports.register = async (req, res, next) => {
   const { username, password, confirmPassword, email } = req.body;
   try {
-    // validation
-    console.log(req.body)
-    if (!(username && password && confirmPassword)) {
+    // Validation
+    console.log(req.body);
+    if (!(username && password && confirmPassword && email)) {
       return next(new Error("Fulfill all inputs"));
     }
     if (confirmPassword !== password) {
-      throw new Error("confirm password not match");
+      throw new Error("Confirm password does not match");
+    }
+
+    // Check for existing user
+    const existingUser = await db.user.findFirst({
+      where: {
+        OR: [{ username }, { email }]
+      }
+    });
+
+    if (existingUser) {
+      throw new Error("Username or Email already exists");
     }
 
     const hashedPassword = await bcrypt.hash(password, 8);
     console.log(hashedPassword);
     const data = {
       username,
-      password : hashedPassword,
+      password: hashedPassword,
       email,
-      role : 'User'
+      role: 'User'
     };
 
-    const rs = await db.user.create({ data  })
-    console.log(rs)
+    const rs = await db.user.create({ data });
+    console.log(rs);
 
-    res.json({ msg: 'Register successful' })
+    res.json({ msg: 'Register successful' });
   } catch (err) {
     next(err);
-    console.log(err)
+    console.log(err);
+  }
+};
+
+exports.registerdelivery = async (req, res, next) => {
+  const { username, password, confirmPassword, email } = req.body;
+  try {
+    // Validation
+    console.log(req.body);
+    if (!(username && password && confirmPassword && email)) {
+      return next(new Error("Fulfill all inputs"));
+    }
+    if (confirmPassword !== password) {
+      throw new Error("Confirm password does not match");
+    }
+
+    // Check for existing user
+    const existingUser = await db.user.findFirst({
+      where: {
+        OR: [{ username }, { email }]
+      }
+    });
+
+    if (existingUser) {
+      throw new Error("Username or Email already exists");
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 8);
+    console.log(hashedPassword);
+    const data = {
+      username,
+      password: hashedPassword,
+      email,
+      role: 'DELIVERY'
+    };
+
+    const rs = await db.user.create({ data });
+    console.log(rs);
+
+    res.json({ msg: 'Register successful' });
+  } catch (err) {
+    next(err);
+    console.log(err);
   }
 };
 
@@ -67,3 +120,97 @@ exports.getme = (req,res,next) => {
   }
 }
 
+exports.createProfileUser = async (req, res, next) => {
+  try {
+    const { realname, lastname, gender, phone } = req.body;
+    const userId = parseInt(req.user.id)
+    
+    const newProfile = await db.profileuser.create({
+      data: {
+        userId,
+        realname,
+        lastname,
+        gender: parseInt(gender),
+        phone,
+      },
+    });
+
+    res.json({ message: "Profile created successfully", newProfile });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getProfileByUser = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+
+    const profile = await db.profileuser.findFirst({
+      where: { userId: userId },
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    res.json({ profile });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+exports.updateProfileUser = async (req, res, next) => {
+  try {
+    const { id } = req.params; // Profile ID from the request parameters
+    const { realname, lastname, gender, phone } = req.body;
+
+    // Convert gender to an integer if it's a string
+    const genderInt = parseInt(gender, 10);
+
+    const updatedProfile = await db.profileuser.update({
+      where: { id: +id },
+      data: {
+        realname,
+        lastname,
+        gender: genderInt, // Use the converted integer value
+        phone,
+      },
+    });
+
+    res.json({ message: "Profile updated successfully", updatedProfile });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getAllUsers = async (req, res, next) => {
+  try {
+    const users = await db.user.findMany({
+      include: {
+        Profileuser: true,
+      },
+    });
+
+    res.json({ users });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateUserRole = async (req, res, next) => {
+  try {
+    const { role } = req.body;
+    const { id } = req.params;
+
+    // อัปเดต role ของผู้ใช้ในฐานข้อมูล
+    const updatedUser = await db.user.update({
+      where: { id:+id},
+      data: { role: role },
+    });
+
+    res.json({ message: 'User role updated successfully', updatedUser });
+  } catch (error) {
+    next(error);
+  }
+};

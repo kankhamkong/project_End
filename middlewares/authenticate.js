@@ -26,11 +26,11 @@ module.exports = async (req, res, next) => {
       } catch (err) {
         if (err.name === 'TokenExpiredError') {
           // โทเค็นหมดอายุ
-          return res.statusCode(400).json({message: 'TokenExpiredError หรือ โทเคนหมดอายุ'})
+          return res.status(400).json({message: 'TokenExpiredError หรือ โทเคนหมดอายุ'})
         } else {
           // ข้อผิดพลาดอื่นๆ
           console.log('Token verification failed:', err.message);
-          return res.statusCode(400).json({ message : `Token verification failed : ${err.message}`});
+          return res.status(400).json({ message : `Token verification failed : ${err.message}`});
         }
       }
   }catch(err) {
