@@ -6,7 +6,7 @@ exports.register = async (req, res, next) => {
   const { username, password, confirmPassword, email } = req.body;
   try {
     // Validation
-    console.log(req.body);
+    //console.log(req.body);
     if (!(username && password && confirmPassword && email)) {
       return next(new Error("Fulfill all inputs"));
     }
@@ -26,7 +26,7 @@ exports.register = async (req, res, next) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 8);
-    console.log(hashedPassword);
+    //console.log(hashedPassword);
     const data = {
       username,
       password: hashedPassword,
@@ -35,12 +35,12 @@ exports.register = async (req, res, next) => {
     };
 
     const rs = await db.user.create({ data });
-    console.log(rs);
+    //console.log(rs);
 
     res.json({ msg: 'Register successful' });
   } catch (err) {
     next(err);
-    console.log(err);
+    //console.log(err);
   }
 };
 
@@ -48,7 +48,7 @@ exports.registerdelivery = async (req, res, next) => {
   const { username, password, confirmPassword, email } = req.body;
   try {
     // Validation
-    console.log(req.body);
+    //console.log(req.body);
     if (!(username && password && confirmPassword && email)) {
       return next(new Error("Fulfill all inputs"));
     }
@@ -68,7 +68,7 @@ exports.registerdelivery = async (req, res, next) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 8);
-    console.log(hashedPassword);
+    //console.log(hashedPassword);
     const data = {
       username,
       password: hashedPassword,
@@ -77,12 +77,12 @@ exports.registerdelivery = async (req, res, next) => {
     };
 
     const rs = await db.user.create({ data });
-    console.log(rs);
+    //console.log(rs);
 
     res.json({ msg: 'Register successful' });
   } catch (err) {
     next(err);
-    console.log(err);
+    //console.log(err);
   }
 };
 
@@ -105,7 +105,7 @@ exports.login = async (req, res, next) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: '30d'
     })
-    console.log(token)
+    //console.log(token)
     res.json({token : token})
   }catch(err) {
     next(err)
@@ -116,7 +116,7 @@ exports.getme = (req,res,next) => {
   try {
     res.json(req.user)
   }catch(err) {
-    console.log(err)
+    //console.log(err)
   }
 }
 

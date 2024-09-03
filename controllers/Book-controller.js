@@ -83,7 +83,7 @@ exports.getByid = async (req, res, next) => {
 exports.getBookOptions = async (req, res, next) => {
   try {
     const { id } = req.params;
-    console.log(id);
+    //console.log(id);
 
     const limit = parseInt(req.query.limit) || 10;
     const page = parseInt(req.query.page) || 1;
@@ -146,7 +146,7 @@ exports.addToCart = async (req, res, next) => {
       },
     });
 
-    console.log("Existing cart item:", existingCartItem);
+    //console.log("Existing cart item:", existingCartItem);
 
     let cartItem;
     if (existingCartItem) {
@@ -171,7 +171,7 @@ exports.addToCart = async (req, res, next) => {
       });
     }
 
-    console.log("Cart item:", cartItem);
+    //console.log("Cart item:", cartItem);
     res.json({ cartItem });
   } catch (err) {
     console.error("Error in addToCart:", err);
@@ -421,9 +421,10 @@ exports.getOrderDetailHistory = async (req, res, next) => {
 
 exports.getPayment = async (req, res, next) => {
   try {
-    const payments = await prisma.payment.findMany({
+    const payments = await db.payment.findMany({
       where: { userId: req.user.id },
       include: {
+        addrss: true, 
         Order: {
           include: {
             order_details: {
@@ -436,60 +437,82 @@ exports.getPayment = async (req, res, next) => {
       },
     });
 
-    if (payments.length === 0) {
-      console.log("No payment found");
-    }
+    // Send the payments data as a response
     res.json(payments);
   } catch (error) {
     next(error);
   }
 };
 
+
+
 exports.createPayment = async (req, res, next) => {
   try {
-    const { paymentData } = req.body;
+    const paymentData = req.body;
     console.log(paymentData);
-    const rs = await prisma.payment.create({
+
+    // ตรวจสอบ addressId หากมีการระบุที่อยู่
+    let addrssIds = null;
+    if (paymentData.addressId) {
+      const address = await prisma.address.findFirst({
+        where: {
+          userId: req.user.id,
+          id: paymentData.addressId,
+        },
+      });
+
+      if (address) {
+        addrssIds = address.id;
+      } else {
+        return res.status(400).json({ message: "Address not found" });
+      }
+    }
+
+    const { userId, totalQuantity, totalPrice, method, addrssId, status, statusdelovery, statusdescription, orderId } = req.body
+
+    // สร้าง Payment record พร้อมข้อมูลที่เกี่ยวข้องอย่างถูกต้อง
+    const payment = await db.payment.create({
       data: {
-        totalQuantity: paymentData.totalQuantity,
-        totalPrice: paymentData.totalAmount,
-        orderId: paymentData.orderId,
-        method: paymentData.method,
-        userId: req.user.id,
-        status: 1,
-        address: paymentData.address,
-        statusdelovery: 0,
+       userId: parseInt(userId),
+       totalQuantity: parseInt(totalQuantity),
+       totalPrice: parseInt(totalPrice),
+       method,
+       status: 1,
+       statusdelovery: 0 ,
+       statusdescription: paymentData.statusdescription,
+       addrssId: parseInt(addrssId),
+       orderId: parseInt(orderId),
       },
     });
 
-    if (!rs) {
+    if (!payment) {
       return res.status(400).json({ message: "Unable to create payment" });
     }
 
+    // อัปเดตสถานะ Order
     const updateOrder = await prisma.order.update({
       where: {
-        id: rs.orderId,
+        id: paymentData.orderId,
       },
       data: {
         status: 1,
       },
     });
 
-    await prisma.cart.deleteMany({
-      where: { userId: Number(req.user.id) }, // แก้ไขเป็น req.user.id แทน userId
+    await db.cart.deleteMany({
+      where: { userId: Number(req.user.id) },
     });
 
-    res.json({ payment: rs, order: updateOrder });
+    res.json({ payment, order: updateOrder });
   } catch (error) {
     next(error);
   }
 };
 
-
 exports.cancelPayment = async (req, res, next) => {
   try {
     const { paymentData } = req.body;
-    console.log(paymentData)
+    //console.log(paymentData)
     if(paymentData === undefined){
       return res.status(400).json({ message: "Data is undefined" });
     }
@@ -506,7 +529,7 @@ exports.cancelPayment = async (req, res, next) => {
       },
     });
 
-    console.log(rs)
+    //console.log(rs)
 
     if (!rs) {
       return res.status(400).json({ message: "Unable to create payment" });
@@ -550,38 +573,44 @@ exports.getPaymentHistoryForAdmin = async (req, res, next) => {
           include: {
             order_details: {
               include: {
-                book: true,
+                book: true, // Include book details within order details
               },
             },
           },
         },
-        user: true, // include ข้อมูลผู้ใช้งาน
+        user: true, // Include user details
+        addrss: true, // Include address details
       },
     });
 
     if (payments.length === 0) {
       console.log("No payments found");
+      return res.status(404).json({ message: "No payments found" });
     }
+
     res.json(payments);
   } catch (error) {
+    console.error("Error fetching payment history for admin:", error);
     next(error);
   }
 };
 
+
 exports.updatePaymentStatuscancel = async (req, res, next) => {
   try {
-    const { status, statusdelovery } = req.body;
+    const { status, statusdelovery,statusdescription } = req.body;
     const { id } = req.params; // Payment ID from the request parameters
 
-    console.log(id, status, statusdelovery);
-    console.log(req.body)
+    //console.log(id, status, statusdelovery);
+    //console.log(req.body)
 
     // Update payment status
     const updatedPayment = await prisma.payment.update({
       where: { id:+id }, // Use the 'id' directly from req.params
       data: {
         status: status, // Use the status from the request body
-        statusdelovery: statusdelovery, // Use the statusdelovery from the request body
+        statusdelovery: statusdelovery,
+        statusdescription: statusdescription,
       },
     });
 
